@@ -59,12 +59,21 @@ def has_warmup(warmup: str, division: str) -> bool:
         return False
 
 
+def split_divisions(df: pd.DataFrame) -> pd.DataFrame:
+    # Create one row per Division and reset index to get rid of duplicates
+    df = move_column_inplace(df, 'Divisions', 0)
+    df = df.explode('Divisions')
+    df.reset_index(drop=True, inplace=True)
+    df['Divisions'] = df['Divisions'].str.strip()
+    df.sort_values('Divisions', inplace=True)
+    return df
+
+
 def create_secretary(entries: pd.DataFrame):
     """
-    Creates the Secretary output.
+    Do transformations for Secretary form and write to excel file.
 
     :param entries: DataFrame
-    :param show_type: ShowType
     """
 
     secretary = entries.copy()
@@ -77,16 +86,14 @@ def create_secretary(entries: pd.DataFrame):
 
 
 def create_schedule(entries: pd.DataFrame):
-    schedule = entries.copy()
+    """
+    Do transformations for Schedule form and write to excel file.
+
+    :param entries: DataFrame
+    """
+    schedule = split_divisions(entries.copy())
     schedule = schedule.drop(columns=['#', 'Date Submitted', 'Status', 'Rider Age',
                                       'TIP Number', 'Phone', 'Email', 'Total', 'Coggins'])
-
-    # Create one row per Division and reset index to get rid of duplicates
-    schedule = move_column_inplace(schedule, 'Divisions', 0)
-    schedule = schedule.explode('Divisions')
-    schedule.reset_index(drop=True, inplace=True)
-    schedule['Divisions'] = schedule['Divisions'].str.strip()
-    schedule.sort_values('Divisions', inplace=True)
 
     # Need to check Warmup value to warmup_mapping and change value to Yes if it matches
     for i, row in schedule.iterrows():
@@ -98,14 +105,26 @@ def create_schedule(entries: pd.DataFrame):
     schedule.to_excel('Schedule.xlsx', index=False)
 
 
-def create_placings():
-    pass
+def create_placings(entries: pd.DataFrame):
+    """
+    Do transformations for Placings form and write to excel file.
 
+    :param entries: DataFrame
+    """
+    placings = split_divisions(entries.copy())
+    placings = placings.drop(columns=['#', 'Status', 'Date Submitted', 'Rider Age', 'Trainer',
+                                      'TIP Number', 'Phone', 'Email', 'Warmup', 'Total', 'Coggins'])
+    placings['Class 1'] = ""
+    placings['Class 2'] = ""
+    placings['Class 3'] = ""
+    placings['Ch/Res'] = ""
+    placings.to_excel('Placings.xlsx', index=False)
 
 def main():
     entries = load_entries()
     create_secretary(entries)
     create_schedule(entries)
+    create_placings(entries)
 
 
 if __name__ == "__main__":
