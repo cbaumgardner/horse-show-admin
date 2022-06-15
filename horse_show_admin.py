@@ -2,11 +2,12 @@ from enum import Enum
 import pandas as pd
 from styleframe import StyleFrame
 
+
 """
 Load the show entries and create three output files
-    1) Secretary
-    2) Schedule
-    3) Placings/Gate
+    1) Secretary.xlsx
+    2) Schedule.xlsx
+    3) Placings/Gate.xlsx
 """
 
 
@@ -30,6 +31,7 @@ warmup_mapping = {
     "48-50 - Child/Adult Hunter* (2'6)": "Child/Adult Hunter Warmup"
 }
 
+
 def load_entries() -> pd.DataFrame:
     """
     Loads input entries.xlsx file
@@ -50,6 +52,13 @@ def move_column_inplace(df, col, pos):
     return df
 
 
+def has_warmup(warmup: str, division: str) -> bool:
+    try:
+        return warmup == warmup_mapping[division]
+    except KeyError:
+        return False
+
+
 def create_secretary(entries: pd.DataFrame):
     """
     Creates the Secretary output.
@@ -61,23 +70,31 @@ def create_secretary(entries: pd.DataFrame):
     secretary = entries.copy()
     secretary['Paid'] = ""
     secretary['Method'] = ""
-    secretary = secretary.drop(columns=['#','Status', 'Coggins', 'Status', 'TIP Number', 'Phone', 'Email', 'Date Submitted'])
+    secretary = secretary.drop(columns=['#','Status', 'Coggins', 'Status', 'TIP Number', 'Phone',
+                                        'Email', 'Date Submitted'])
     secretary['Divisions'] = secretary['Divisions'].apply(lambda x: ('\n'.join(x)))
     StyleFrame(secretary).to_excel('Secretary.xlsx', index=False).save()
 
 
 def create_schedule(entries: pd.DataFrame):
     schedule = entries.copy()
-    schedule = schedule.drop(columns=['#', 'Date Submitted', 'Status', 'Rider Age', 'TIP Number', 'Phone', 'Email', 'Total', 'Coggins'])
+    schedule = schedule.drop(columns=['#', 'Date Submitted', 'Status', 'Rider Age',
+                                      'TIP Number', 'Phone', 'Email', 'Total', 'Coggins'])
+
+    # Create one row per Division and reset index to get rid of duplicates
     schedule = move_column_inplace(schedule, 'Divisions', 0)
     schedule = schedule.explode('Divisions')
+    schedule.reset_index(drop=True, inplace=True)
     schedule['Divisions'] = schedule['Divisions'].str.strip()
     schedule.sort_values('Divisions', inplace=True)
+
     # Need to check Warmup value to warmup_mapping and change value to Yes if it matches
-    #schedule['Warmup'] = schedule['Warmup'].apply(lambda x: 'Yes' if schedule['Warmup'] == warmup_mapping[schedule['Divisions']] else '')
-    #schedule.loc[warmup_mapping.get(schedule['Divisions']) == schedule['Warmup']] = 'Yes'
-    print(warmup_mapping.get(schedule['Divisions']))
-    #StyleFrame(schedule).to_excel('Schedule.xlsx', index=False).save()
+    for i, row in schedule.iterrows():
+        warmup_val = ''
+        if has_warmup(row['Warmup'],row['Divisions']):
+            warmup_val = 'Yes'
+        schedule.at[i, 'Warmup'] = warmup_val
+
     schedule.to_excel('Schedule.xlsx', index=False)
 
 
